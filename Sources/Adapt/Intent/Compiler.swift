@@ -182,8 +182,6 @@ public class Compiler {
             self.trainingSet      = trainingSet         
             self.objectiveFunctionRawString = objectiveFunctionRawString
             self.knobConstraintsRawString = knobConstraintsRawString
-
-print("MER!!?")
             self.costOrValue = { measureValuesArray in
                 guard let objectiveFunctionString = objectiveFunctionRawString else {
                     Adapt.fatalError("Objective function is not defined.")

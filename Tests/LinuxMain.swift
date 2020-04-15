@@ -1,7 +1,4 @@
 import XCTest
+@testable import AdaptTests
 
-import AdaptTests
-
-var tests = [XCTestCaseEntry]()
-tests += AdaptTests.allTests()
-XCTMain(tests)
+XCTMain([testCase(AdaptTests.allTests)])

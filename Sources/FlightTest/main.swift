@@ -19,12 +19,6 @@ struct InputWithLastDFTCoefficients {
     var b : [Double] = [Double]() // imaginary part coefficients
 }
 
-
-func inverse(_ input: [[Double]]) -> ([[Double]]) {
-    return input
-}
-
-
 // Recursive Least Squre
 // neww consists of the filter coefficients
 // newP consists of estimated inverse covariance which will be needed for the next update
@@ -137,8 +131,8 @@ func testFunction(input : Double, knob: [String : KnobValue]) -> (Double, [Strin
 Log.debug("Initialize the test function.")
 let controllableTestFunction: ControllableFunction<Double,Double>
 do {
-    Log.debug("Load intent from:" + FileManager().currentDirectoryPath + "/Sources/FlightTest/test.intent")
-    let content = try String(contentsOfFile: FileManager().currentDirectoryPath + "/Sources/FlightTest/test.intent", encoding: .utf8)
+    Log.debug("Load intent from:" + FileManager.default.currentDirectoryPath + "/Sources/FlightTest/test.intent")
+    let content = try String(contentsOfFile: FileManager.default.currentDirectoryPath + "/Sources/FlightTest/test.intent", encoding: .utf8)
     controllableTestFunction = ControllableFunction<Double,Double>(functionBody: testFunction, id: "test", intent: Compiler().compileIntentSpec(source: content)!, saveMeasureValues: true)
     let input = 0.0
     controllableTestFunction.exhaustiveProfilingWithFixedInputs(input)
@@ -148,6 +142,4 @@ do {
 }
 catch {Adapt.fatalError("Error: Cannot read the file.")}
 
-
-    
 controllableTestFunction.plot()

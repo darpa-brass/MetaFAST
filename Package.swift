@@ -19,6 +19,7 @@ let package = Package(
     .target(name: "Adapt", dependencies: [
       "HeliumLogger", "Expression", "SwiftAST", "CSwiftV", "MulticonstrainedOptimizer"]),
     .target(name: "FlightTest", dependencies: ["Adapt"]),
+    .testTarget(name: "AdaptTests", dependencies: ["Adapt", "FlightTest"])
   ],
   swiftLanguageVersions: [4]
 )

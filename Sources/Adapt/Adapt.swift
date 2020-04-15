@@ -78,13 +78,20 @@ public class ControllableFunction<Input, Output> {
         var outputPath : String
         var iteration = 0
         var csvdata : [String : String] = [:]
-
+        
         if (userSpecifiedOutputPath == nil) {
-            do{
-                try FileManager().createDirectory(atPath: "Plots", withIntermediateDirectories: true)
+            var isDirectory = ObjCBool(true)
+            var directoryExists = FileManager.default.fileExists(atPath: "Plots", isDirectory: &isDirectory)
+            if !directoryExists {
+                do{
+                    try FileManager.default.createDirectory(atPath: "Plots", withIntermediateDirectories: false)
+                }
+                catch {Adapt.fatalError("Error: Cannot create directory 'Plots'.")}
             }
-            catch {Adapt.fatalError("Error: Cannot creat directory 'Plots'.")}
-            outputPath = FileManager().currentDirectoryPath + "/Plots"
+            else if !isDirectory.boolValue {
+                Adapt.fatalError("Error: The file 'Plots' exists at current working directory. Cannot create directory 'Plots'.")
+            }
+            outputPath = FileManager.default.currentDirectoryPath + "/Plots"
         }
         else {
             outputPath = userSpecifiedOutputPath!

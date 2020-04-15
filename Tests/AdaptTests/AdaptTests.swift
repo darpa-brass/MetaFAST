@@ -1,15 +1,13 @@
 import XCTest
-@testable import Adapt
+@testable import FlightTest
 
-final class AdaptTests: XCTestCase {
-    func testExample() {
-        // This is an example of a functional test case.
-        // Use XCTAssert and related functions to verify your tests produce the correct
-        // results.
-        XCTAssertEqual(Adapt().text, "Hello, World!")
+class AdaptTests: XCTestCase {
+
+    func testInverse() {
+        XCTAssertEqual(inverse([[7,2,1],[0,3,-1],[-3,4,-2]]), [[-2.0, 8.0, -5.0], [3.0, -11.0, 7.0], [9.0, -34.0, 21.0]])
     }
 
     static var allTests = [
-        ("testExample", testExample),
+        ("testInverse", testInverse)
     ]
 }
