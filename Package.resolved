@@ -1,0 +1,70 @@
+{
+  "object": {
+    "pins": [
+      {
+        "package": "bocho",
+        "repositoryURL": "https://github.com/yanagiba/bocho",
+        "state": {
+          "branch": null,
+          "revision": "411fb57fe99824ebe8f107c69cf61fc8bc68853d",
+          "version": "0.1.1"
+        }
+      },
+      {
+        "package": "CSwiftV",
+        "repositoryURL": "https://github.com/Daniel1of1/CSwiftV",
+        "state": {
+          "branch": null,
+          "revision": "a1a04d3915028c03884df4ed53757c7480233b68",
+          "version": "0.0.7"
+        }
+      },
+      {
+        "package": "Expression",
+        "repositoryURL": "https://github.com/nicklockwood/Expression",
+        "state": {
+          "branch": null,
+          "revision": "c251b93f7d195996e20d58938447f3ac2e8b1811",
+          "version": "0.12.11"
+        }
+      },
+      {
+        "package": "HeliumLogger",
+        "repositoryURL": "https://github.com/IBM-Swift/HeliumLogger",
+        "state": {
+          "branch": null,
+          "revision": "2afeb4c02f5a48a7fbd081fe8607b91eeebd7ecb",
+          "version": "1.7.1"
+        }
+      },
+      {
+        "package": "LoggerAPI",
+        "repositoryURL": "https://github.com/IBM-Swift/LoggerAPI.git",
+        "state": {
+          "branch": null,
+          "revision": "5041f2673aa75d6e973d9b6bd3956bc5068387c8",
+          "version": "1.7.3"
+        }
+      },
+      {
+        "package": "MulticonstrainedOptimizer",
+        "repositoryURL": "git@github.mit.edu:proteus/MulticonstrainedOptimizer",
+        "state": {
+          "branch": null,
+          "revision": "1afdec1ab66e5b7ac7efaaf6bd8d68f364d88bc3",
+          "version": "0.0.15"
+        }
+      },
+      {
+        "package": "swift-ast",
+        "repositoryURL": "git@github.mit.edu:proteus/swift-ast",
+        "state": {
+          "branch": null,
+          "revision": "06c530a196ce8ef55fc03ecfa542ac7652cbc440",
+          "version": "0.2.0"
+        }
+      }
+    ]
+  },
+  "version": 1
+}

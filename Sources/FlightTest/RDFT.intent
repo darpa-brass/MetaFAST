@@ -1,0 +1,10 @@
+knobs    harmonicNumber from [1 reference,2,3,4,5]
+         coreFrequency from [300 reference,1200]
+
+measures    latency: Double
+            energy: Double
+            PSNR : Double
+
+intent test  min(latency) such that PSNR == 0.1
+
+trainingSet []
