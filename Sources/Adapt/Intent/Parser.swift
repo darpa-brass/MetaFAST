@@ -3,7 +3,7 @@
  *
  *        Intent Specification Parser
  *
- *  authors: Dung X Nguyen, Adam Duracz
+ *  authors: Dung X Nguyen, Adam Duracz, Yao-Hsiang Yang
  *
  */
 
@@ -18,21 +18,24 @@ import MulticonstrainedOptimizer
 //---------------------------------------
 
 /**
- * A knob declaration consists of a name, a range of values, and a reference value
+ * A knob declaration consists of a name, a range of values, a reference value and 
+   a flag indicating whether the knob is continuous
  */
 public class KnobDecl : Expression {
     public var name: String
     public var range: Expression
     public var reference: Expression
+    public var isContinuous: Bool
 
-    public init(name: String, range: Expression, reference: Expression) {
+    public init(name: String, range: Expression, reference: Expression, isContinuous: Bool) {
         self.name = name
         self.range = range
         self.reference = reference
+        self.isContinuous = isContinuous
     }
 
     public var textDescription: String {
-        return "KnobDecl(\(name), \(range), \(reference))"
+        return "KnobDecl(\(name), \(range), \(reference), \(isContinuous))"
     }
 
     public var lexicalParent: ASTNode? = nil
@@ -215,43 +218,64 @@ class IntentParser : Parser {
     /* Knob Section */
 
     // knobRange :: [ (knobExp ,)*  knobExp reference  (, knobExp )* ]
+    //           :: [ knobExp ... knobExp ] reference knobExp
     func parseKnobRange(config: ParserExpressionConfig = ParserExpressionConfig())
-    throws -> (Expression, Expression) {
+    throws -> (Expression, Expression, Bool) {
         let lookedRange = _lexer.look().sourceRange
         let startLocation = lookedRange.start
         if case.leftSquare = _lexer.look().kind {
             _lexer.advance(by:1)
-            var refExpr: Expression?
-            var exprs = [Expression]()
-            repeat {
-                let expr = try super.parseExpression(config: config)
-                exprs.append(expr)
-                if case .identifier(let myKeyword, _) = _lexer.look().kind, myKeyword == "reference" {
-                    if refExpr != nil {
-                        Adapt.fatalError("Multiple 'reference' values found in knob range.")
-                    }
-                    refExpr = expr
-                    _lexer.advance(by:1)
-                }
+            if case .binaryOperator("...") = _lexer.look(ahead:1).kind {
+                let rangeExpr =  try super.parseExpression(config: config) as! BinaryOperatorExpression
+                let arrayExpr = LiteralExpression(kind: .array([rangeExpr.leftExpression,rangeExpr.rightExpression]))
                 if case.rightSquare = _lexer.look().kind {
-                    let endLocation = getEndLocation()
-                    let arrayExpr = LiteralExpression(kind: .array(exprs))
+                    _lexer.advance(by:1)
+                    if case .identifier(let myKeyword, _) = _lexer.look().kind, myKeyword == "reference" {
+                        _lexer.advance(by:1)
+                        let refExpr = try super.parseExpression(config: config)
+                        return (arrayExpr, refExpr, true)
+                     }
+                     else {
+                        Adapt.fatalError("Expected 'reference'. Found: \(_lexer.look().kind).")
+                     }
+                }
+                else {
+                    Adapt.fatalError("Expected ']'. Found: \(_lexer.look().kind).")
+                }
+            }
+            else {
+                var refExpr: Expression?
+                var exprs = [Expression]()
+                repeat {
+                    let expr = try super.parseExpression(config: config)
+                    exprs.append(expr)
+                    if case .identifier(let myKeyword, _) = _lexer.look().kind, myKeyword == "reference" {
+                        if refExpr != nil {
+                            Adapt.fatalError("Multiple 'reference' values found in knob range.")
+                        }
+                        refExpr = expr
+                        _lexer.advance(by:1)
+                    }
+                    if case.rightSquare = _lexer.look().kind {
+                        let endLocation = getEndLocation()
+                        let arrayExpr = LiteralExpression(kind: .array(exprs))
                     arrayExpr.setSourceRange(startLocation, endLocation)
                     _lexer.advance(by:1)
                     if let goodRefExpr = refExpr {
-                        return (arrayExpr, goodRefExpr)
+                        return (arrayExpr, goodRefExpr, false)
                     }
                     else {
                         Adapt.fatalError("No 'reference' value found in knob range.")
                     }                    
-                }
-                else if case.comma = _lexer.look().kind {
-                    _lexer.advance(by:1)
-                }
-                else {
-                    Adapt.fatalError("Expected ',' or ']'. Found: \(_lexer.look().kind).")
-                }
-            } while true
+                    }
+                    else if case.comma = _lexer.look().kind {
+                        _lexer.advance(by:1)
+                    }
+                    else {
+                        Adapt.fatalError("Expected ',' or ']'. Found: \(_lexer.look().kind).")
+                    }
+                } while true
+            }
         } else {
             Adapt.fatalError("Expected '['. Found: \(_lexer.look().kind).")
         }
@@ -264,8 +288,8 @@ class IntentParser : Parser {
             _lexer.advance(by:1)
             if case .identifier(let fromKeyword, _) = _lexer.look().kind, fromKeyword == "from"  {
                 _lexer.advance(by:1)
-                let (knobValue, referenceExpr) = try parseKnobRange(config: config)
-                return KnobDecl(name: knobName, range: knobValue, reference: referenceExpr)
+                let (knobValue, referenceExpr, isContinuous) = try parseKnobRange(config: config)
+                return KnobDecl(name: knobName, range: knobValue, reference: referenceExpr, isContinuous: isContinuous)
             } else {
                 Adapt.fatalError("Expected 'from' after knob name. Found: \(_lexer.look().kind).")
             }

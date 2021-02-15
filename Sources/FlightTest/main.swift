@@ -1,5 +1,6 @@
 import Foundation
 import Adapt
+import FlightTestUtils
 import HeliumLogger
 import LoggerAPI
 
@@ -117,12 +118,13 @@ func RDFT(input : InputWithLastDFTCoefficients, knob : [String : KnobValue]) -> 
 func testFunction(input : Double, knob: [String : KnobValue]) -> (Double, [String : Double]) {
     var sum = input
     let step: Int = knob["step"]!.value() as! Int
+    let scale: Double = knob["scale"]!.value() as! Double
     var measure = [String : Double]()
     for i in 0 ..<  (2 * step + 1) {
         sum += Double(i)
     }
     
-    measure["increase"] = sum - input
+    measure["increase"] = (sum - input) / scale
 
     return (sum, measure)
 }
@@ -130,14 +132,18 @@ func testFunction(input : Double, knob: [String : KnobValue]) -> (Double, [Strin
 // Example starts here
 Log.debug("Initialize the test function.")
 let controllableTestFunction: ControllableFunction<Double,Double>
+let controllableTestFunction2: ControllableFunction<Double,Double>
 do {
     Log.debug("Load intent from:" + FileManager.default.currentDirectoryPath + "/Sources/FlightTest/test.intent")
     let content = try String(contentsOfFile: FileManager.default.currentDirectoryPath + "/Sources/FlightTest/test.intent", encoding: .utf8)
     controllableTestFunction = ControllableFunction<Double,Double>(functionBody: testFunction, id: "test", intent: Compiler().compileIntentSpec(source: content)!, saveMeasureValues: true)
+    controllableTestFunction2 = ControllableFunction<Double,Double>(functionBody: testFunction, id: "test", intent: Compiler().compileIntentSpec(source: content)!, saveMeasureValues: true)
     let input = 0.0
-    controllableTestFunction.exhaustiveProfilingWithFixedInputs(input)
+    controllableTestFunction.exhaustiveProfilingWithFixedInputs(input, 5, 5)
+    controllableTestFunction2.exhaustiveProfilingWithFixedInputs(input, 5, 5)
     for _ in 0 ..< 100 {
         print(controllableTestFunction.execute(input: input))
+        print(controllableTestFunction2.execute(input: input))
     }
 }
 catch {Adapt.fatalError("Error: Cannot read the file.")}

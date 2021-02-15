@@ -7,6 +7,7 @@ let package = Package(
   products: [
     .executable(name: "FlightTest", targets: ["FlightTest"]),
     .library(name: "Adapt", targets: ["Adapt"]),
+    .library(name: "FlightTestUtils", targets: ["FlightTestUtils"]),
   ],
   dependencies: [
     .package(url: "https://github.com/Daniel1of1/CSwiftV", .exact("0.0.7")),
@@ -18,8 +19,9 @@ let package = Package(
   targets: [
     .target(name: "Adapt", dependencies: [
       "HeliumLogger", "Expression", "SwiftAST", "CSwiftV", "MulticonstrainedOptimizer"]),
-    .target(name: "FlightTest", dependencies: ["Adapt"]),
-    .testTarget(name: "AdaptTests", dependencies: ["Adapt", "FlightTest"])
+    .target(name: "FlightTestUtils", dependencies: []),
+    .target(name: "FlightTest", dependencies: ["Adapt", "FlightTestUtils"]),
+    .testTarget(name: "AdaptTests", dependencies: ["Adapt", "FlightTestUtils"])
   ],
   swiftLanguageVersions: [4]
 )

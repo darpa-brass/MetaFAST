@@ -3,7 +3,7 @@
  *
  *        Representation of an intent specification
  *
- *  author: Adam Duracz
+ *  author: Adam Duracz and Yao-Hsiang Yang
  */
 
 //---------------------------------------
@@ -15,10 +15,11 @@ import MulticonstrainedOptimizer
 
 public protocol IntentSpec {
 
-
   var name: String { get }
 
-  var knobs: [String : ([KnobValue], KnobValue)]  { get }
+  var knobs: [String : KnobRange]  { get }
+
+  var quantizedKnobs: [String : ([KnobValue], KnobValue)]  { get set }
 
   var measures: [String]  { get }
 
@@ -36,10 +37,42 @@ public protocol IntentSpec {
 
 }
 
+public enum KnobRange {
+    case list([KnobValue], KnobValue)
+    case interval(Double, Double, Double)
+} 
+
 extension IntentSpec {
+    // change quantization level for continuous knobs
+    public mutating func quantization(_ quantizationLevel: Int = 2) {
+        self.quantizedKnobs = knobs.mapValues { value in
+            switch value {
+                case let .list(knobValues, referenceValue):
+                    return (knobValues, referenceValue)
+                case let .interval(leftBound, rightBound, referenceValue):
+                    var quantizedInterval: [Double] = [Double](stride(from: leftBound, to: rightBound, by: (rightBound - leftBound) / Double(quantizationLevel - 1)))
+                    // when floating point roundoff error makes right bound outside the stride sequence
+                    if quantizedInterval.count < quantizationLevel {
+                        quantizedInterval.append(rightBound)
+                    }
+                    print(quantizedInterval)
+                    if quantizedInterval.contains(referenceValue) {
+                        return (quantizedInterval.map { .double($0) }, .double(referenceValue))
+                    }
+                    else {
+                        quantizedInterval.append(referenceValue)
+                        return (quantizedInterval.map { .double($0) }, .double(referenceValue))
+                    }
+                default: 
+                    Adapt.fatalError("Unsupported knob range: \(value).")
+             }
+        }
+    }
+
+    // generate the array of all possibleconfigurations
     func knobSpace() -> [[String : KnobValue]] {
         func getKnobValues(for name: String) -> [KnobValue] {
-            let (exhaustiveKnobValues, _) = knobs[name]!
+            let (exhaustiveKnobValues, _) = quantizedKnobs[name]!
             return  exhaustiveKnobValues
         }
 
@@ -69,7 +102,7 @@ extension IntentSpec {
             }
         }
     
-        let knobNames = Array(knobs.keys).sorted()
+        let knobNames = Array(quantizedKnobs.keys).sorted()
         return build(space: [[String : KnobValue]](), remainingKnobs: knobNames)
     }
 }

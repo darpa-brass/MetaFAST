@@ -152,7 +152,8 @@ public class Compiler {
     /** SWIFT representation of a Adapt intent specification file. */
     class CompiledIntentSpec : IntentSpec {
             let name             : String                               // name of application
-            let knobs            : [String : ([KnobValue], KnobValue)]              // list of knobs, each with range and reference
+            let knobs            : [String : KnobRange]                 // list of knobs, each with range and reference
+            var quantizedKnobs   : [String : ([KnobValue], KnobValue)]  // list of knobs, each with quantized range and reference
             let measures         : [String]                             // alphabetically sorted list of measure names
             let constraints      : [String : (Double, ConstraintType)]  // dynamic multi constraints
             let costOrValue      : ([Double]) -> Double // takes an array of measure values corresponding to all the measures 
@@ -165,7 +166,7 @@ public class Compiler {
             var knobConstraintsRawString   : String?    // the textual representation of the knob constraints.
 
         init( name             : String
-                , knobs            : [String : ([KnobValue], KnobValue)]
+                , knobs            : [String : KnobRange]
                 , measures         : [String]
                 , constraints      : [String : (Double, ConstraintType)]
                 , optimizationType : OptimizationType
@@ -176,6 +177,21 @@ public class Compiler {
         {
             self.name             = name            
             self.knobs            = knobs           
+            self.quantizedKnobs   = knobs.mapValues { value in
+                switch value {
+                    case let .list(knobValues, referenceValue):
+                        return (knobValues, referenceValue)
+                    case let .interval(leftBound, rightBound, referenceValue):
+                        if referenceValue != leftBound && referenceValue != rightBound {
+                            return ([.double(leftBound), .double(referenceValue), .double(rightBound)], .double(referenceValue))
+                        }
+                        else {
+                            return ([.double(leftBound), .double(rightBound)], .double(referenceValue))
+                        }
+                    default: 
+                        Adapt.fatalError("Unsupported knob range: \(value).")
+                 }
+            }
             self.measures         = measures        
             self.constraints      = constraints      
             self.optimizationType = optimizationType
@@ -206,6 +222,8 @@ public class Compiler {
                 return result
             }
         }
+
+        
 
         /*
         public func satisfiesKnobConstraints(knobSettings: KnobSettings) -> Bool {
@@ -380,15 +398,56 @@ public class Compiler {
         }
     }
 
+    internal func compileInterval(_ range: Expression) -> (Double, Double) {
+        var interval = compileRange(range)
+        if interval.count != 2 {
+            Adapt.fatalError("Expected an interval. Found \(range).")
+        }
+        else {
+            let leftBound: Double
+            if case let .double(r) = interval[0] {
+                leftBound = r
+                if case let .double(rightBound) = interval[1] {
+                    return (leftBound, rightBound)
+                }
+                else {
+                    Adapt.fatalError("Right bound \(interval[1]) is not a floating point number.")
+                }
+            }
+            else {
+                Adapt.fatalError("Left bound \(interval[0]) is not a floating point number.")
+            }
+        }
+    }
+
     internal func compileReference(_ reference: Expression) -> KnobValue {
         return compileKnobLiteral(reference)
     }
 
     /** Extract the map of knob declarations [name: (range, reference)] from a parsed intent specification.  */
-    internal func compileKnobs(_ intentExpr: IntentExpression) -> [String : ([KnobValue], KnobValue)] {
-        var res: [String : ([KnobValue], KnobValue)] = [:]
+    internal func compileKnobs(_ intentExpr: IntentExpression) -> [String : KnobRange] {
+        var res: [String : KnobRange] = [:]
         for kd in intentExpr.knobSection.knobDecls {
-            res[kd.name] = (compileRange(kd.range), compileReference(kd.reference))
+            if kd.isContinuous {
+                let (leftBound, rightBound) = compileInterval(kd.range)
+                let referenceValue: Double
+                let le = kd.reference as! LiteralExpression
+                if case let .floatingPoint(r, _) = le.kind {
+                    referenceValue = r
+                }
+                else {
+                    Adapt.fatalError("Reference value \(kd) is not a floating point number.")
+                }
+                if referenceValue > rightBound || referenceValue < leftBound {
+                    Adapt.fatalError("Reference value \(referenceValue) is not in the interval [\(leftBound), \(rightBound)].")
+                }
+                else {
+                    res[kd.name] = .interval(leftBound, rightBound, referenceValue)
+                }                  
+            }
+            else {
+                res[kd.name] = .list(compileRange(kd.range), compileReference(kd.reference))
+            }
         }
         return res
     }

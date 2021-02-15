@@ -7,7 +7,7 @@ public class ControllableFunction<Input, Output> {
     let functionBody : (Input, [String : KnobValue]) -> (Output, [String : Double])
     var controller : MultilinearController
     var predictor : NaivePredictor
-    var intent : IntentSpec?
+    var intent : IntentSpec
     let id : String
     var saveMeasureValues : Bool
     private var recordedMeasureValues : [[String : Double]] = []
@@ -34,7 +34,7 @@ public class ControllableFunction<Input, Output> {
         let nextKnobValues = controller.getNextKnobValues()
         var (output, measureValues) = functionBody(input, nextKnobValues)
         let end = NSDate().timeIntervalSince1970
-        if intent!.measures.contains("latency") {
+        if intent.measures.contains("latency") {
             measureValues["latency"] = end - start
         }
         controller.updateStatistics(knobValues: nextKnobValues, measureValues: measureValues, time: (end + start)/2)
@@ -45,19 +45,24 @@ public class ControllableFunction<Input, Output> {
         return output
     }
 
-    public func exhaustiveProfilingWithFixedInputs(_ sampleInput: Input, _ runs : Int = 1) -> Void {
+    public func exhaustiveProfilingWithFixedInputs(_ sampleInput: Input, _ runs : Int = 1, _ quantizationLevel : Int = 2) -> Void {
         Log.debug("Exhaustively proflie the controllable function \(id)...")
-        let domain = intent!.knobSpace()
+        intent.quantization(quantizationLevel)
+        predictor = NaivePredictor(id, intent) // re-initialize the predictor since we change the quantization level
+        let domain = intent.knobSpace()
         for knobValues in domain {
             Log.debug("Proflie the controllable function \(id) with knob \(knobValues)...")
+            var profiledMeasureValues : [[String : Double]] = []
             var averageMeasureValues : [String : Double] = [:]
+            var varianceOfMeasureValues : [String : Double] = [:]
             for _ in 0 ..< runs {
                 let start = NSDate().timeIntervalSince1970
                 var (_, measureValues) = functionBody(sampleInput, knobValues)
                 let end = NSDate().timeIntervalSince1970
-                if intent!.measures.contains("latency") {
+                if intent.measures.contains("latency") {
                     measureValues["latency"] = end - start
                 }
+                profiledMeasureValues.append(measureValues)
                 for (key, value) in measureValues {
                     if let averageMeasureValue = averageMeasureValues[key] {
                         averageMeasureValues[key] = averageMeasureValue + value
@@ -68,10 +73,24 @@ public class ControllableFunction<Input, Output> {
                 }
             }
             averageMeasureValues.compactMap {$0.1 / Double(runs)}
+            for i in 0 ..< runs {
+                for (key, value) in profiledMeasureValues[i] {
+                    if let varianceOfMeasureValue = varianceOfMeasureValues[key] {
+                        varianceOfMeasureValues[key] = varianceOfMeasureValue + pow(averageMeasureValues[key]! - value, 2)
+                    }
+                    else {
+                        varianceOfMeasureValues[key] = pow(averageMeasureValues[key]! - value, 2)
+                    }
+                }
+            }
+            varianceOfMeasureValues.compactMap {$0.1 / Double(runs)}
             predictor.initializeStatistics(knobValues, averageMeasureValues, NSDate().timeIntervalSince1970)
             Log.debug("Proflie the controllable function \(id) with knob \(knobValues) successfully.")
+
         }
         Log.debug("Exhaustively proflie the controllable function \(id) successfully.")
+        controller.computeSchedule()
+        Log.debug("Recompute the schedule according to new proflie data successfully.")
     }
 
     public func plot(_ gnuplotPath : String = "/usr/bin/gnuplot", _ userSpecifiedOutputPath : String? = nil) -> Void {        
@@ -97,7 +116,7 @@ public class ControllableFunction<Input, Output> {
             outputPath = userSpecifiedOutputPath!
         }
 
-        for measureName in intent!.measures {
+        for measureName in intent.measures {
             csvdata[measureName] = "# X Y\n"
         }
         for measureValues in recordedMeasureValues {
@@ -108,7 +127,7 @@ public class ControllableFunction<Input, Output> {
         }
 
         do {
-            for measureName in intent!.measures {
+            for measureName in intent.measures {
                 try csvdata[measureName]!.write(toFile: outputPath + "/" + id + "_" + measureName + ".data", atomically: false, encoding: .utf8)
             }
         } catch {
@@ -123,7 +142,7 @@ public class ControllableFunction<Input, Output> {
         task.launch()
 
         var plotCommand : String =  "set term png\n"
-        for measureName in intent!.measures {
+        for measureName in intent.measures {
             plotCommand = plotCommand +
               "set title \"Measure " + measureName + " for intent " + id + "\"\n" +
               "set xlabel \"runs\"\n" +
@@ -214,7 +233,9 @@ class NaivePredictor : Predictor {
     }
     
     func initializeStatistics(_ knobValues : [String : KnobValue], _ measureValues : [String : Double], _ time : TimeInterval) -> Void {    
-        baselineMeasure[domain.index(of: knobValues)!] = measureValues
+        guard let index = domain.index(of: knobValues)
+        else {Adapt.fatalError("knobValues \(knobValues) is outside the domain of predictor.")} 
+        baselineMeasure[index] = measureValues
         for (measureName, measureValue) in measureValues {
             Log.debug("Initialize \(measureName) of \(knobValues) with value \(measureValue)")
         }
@@ -391,6 +412,7 @@ class MultilinearController : Controller {
     }
 
     func computeSchedule() {
+        updateOptimizer()
         schedule = (multiconstrainedLinearOptimizer.computeSchedule(window: scheduleSize)).map {predictor.getConfigurationById($0)}
         Log.debug("Compute a schedule. Schedule: \(schedule).")
     }	
