@@ -1,0 +1,8 @@
+knobs    cutoffFrequency from [5 reference,10,15,20,25]
+
+measures    latency: Double
+            MSE : Double
+
+intent LPF  min(latency) such that MSE <= 3.0
+
+trainingSet []

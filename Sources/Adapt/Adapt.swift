@@ -70,9 +70,10 @@ public class ControllableFunction<Input, Output> {
                     else {
                         averageMeasureValues[key] = value
                     }
+
                 }
             }
-            averageMeasureValues.compactMap {$0.1 / Double(runs)}
+            averageMeasureValues = averageMeasureValues.mapValues {value in value / Double(runs)}
             for i in 0 ..< runs {
                 for (key, value) in profiledMeasureValues[i] {
                     if let varianceOfMeasureValue = varianceOfMeasureValues[key] {
@@ -83,12 +84,14 @@ public class ControllableFunction<Input, Output> {
                     }
                 }
             }
-            varianceOfMeasureValues.compactMap {$0.1 / Double(runs)}
+            varianceOfMeasureValues = varianceOfMeasureValues.mapValues {value in value / Double(runs)}
             predictor.initializeStatistics(knobValues, averageMeasureValues, NSDate().timeIntervalSince1970)
-            Log.debug("Proflie the controllable function \(id) with knob \(knobValues) successfully.")
+            Log.debug("Proflie the controllable function \(id) with knob \(knobValues) successfully. The average measures are \(averageMeasureValues).")
 
         }
         Log.debug("Exhaustively proflie the controllable function \(id) successfully.")
+        controller.updatePredictor(predictor: predictor)
+        Log.debug("Update the predictor in controller successfully.")
         controller.computeSchedule()
         Log.debug("Recompute the schedule according to new proflie data successfully.")
     }
@@ -187,7 +190,7 @@ class NaivePredictor : Predictor {
     var overloadNominator: [String : Double] = [:]// Sum_i {(m_i / m0(x_i)) * K_h(t-t_i)}
 
     // hyperparameters for estimation
-    var bandwidth : Double = 10.0
+    var bandwidth : Double = 0.01
 
     init(_ id : String, _ intent : IntentSpec) {
         Log.debug("Initialize a naive predictor for the function \(id)...")
@@ -207,6 +210,7 @@ class NaivePredictor : Predictor {
                 measureValues[measureName] = 1.0
             }
             baselineMeasure.append(measureValues)
+
         }
         lastSampleTime = NSDate().timeIntervalSince1970
         Log.debug("Initialize the naive predictor successfully.")
@@ -244,10 +248,12 @@ class NaivePredictor : Predictor {
     
     func updateStatistics(_ knobValues : [String : KnobValue], _ measureValues : [String : Double], _ time: TimeInterval) -> Void {    
         for (measureName, measureValue) in measureValues {
+            Log.debug("Discount factor: \(exp((lastSampleTime - time) / bandwidth))")
             overloadDenominator[measureName] = overloadDenominator[measureName]! * exp((lastSampleTime - time) / bandwidth)
             overloadNominator[measureName] = overloadNominator[measureName]! * exp((lastSampleTime - time) / bandwidth)
-            overloadDenominator[measureName] = overloadDenominator[measureName]! + 1.0
-            overloadNominator[measureName] = overloadDenominator[measureName]! + (measureValue / baselineMeasure[domain.index(of: knobValues)!][measureName]!)
+            overloadDenominator[measureName] = overloadDenominator[measureName]! + baselineMeasure[domain.index(of: knobValues)!][measureName]!
+            overloadNominator[measureName] = overloadDenominator[measureName]! + measureValue
+            Log.debug("\(measureName) currenly has measure value \(measureValue) while the baseline value is \(baselineMeasure[domain.index(of: knobValues)!][measureName]!). Current knob value is \(knobValues)")
             overload[measureName] = overloadNominator[measureName]! / overloadDenominator[measureName]!
             Log.debug("Update \(measureName) with overload factor \(overload[measureName])")
         }
@@ -263,7 +269,8 @@ class NaivePredictor : Predictor {
     }
     
     func predictValuesById(_ knobId : UInt32) -> [Double] {
-        return baselineMeasure[Int(knobId)].map {key, value in (value * overload[key]!)}
+        let sortedKeys = baselineMeasure[Int(knobId)].keys.sorted()
+        return sortedKeys.map {key in (baselineMeasure[Int(knobId)][key]! * overload[key]!)}
     }
     
     func predict(_ knobValues : [String : KnobValue]) -> [String : Double] {
@@ -293,7 +300,7 @@ protocol Controller {
 }
 
 class MultilinearController : Controller {
-    var scheduleSize : UInt32 = 20
+    var scheduleSize : UInt32 = 100
     var currentScheduleIndex = 0
     var schedule : [[String : KnobValue]]
     var multiconstrainedLinearOptimizer : MulticonstrainedLinearOptimizer<Double>
@@ -321,7 +328,8 @@ class MultilinearController : Controller {
         self.predictor = predictor
         let domain = predictor.getDomain()
         self.domain = domain
-        sizeOfConfigurations = predictor.getSizeOfConfigurations()
+        let sizeOfConfigurations = predictor.getSizeOfConfigurations()
+        self.sizeOfConfigurations = sizeOfConfigurations
 
         constraintsLessOrEqualTo = intent.constraints.filter {$0.1.1 == .lessOrEqualTo}
         constraintsGreaterOrEqualTo = intent.constraints.filter {$0.1.1 == .greaterOrEqualTo}
@@ -380,7 +388,7 @@ class MultilinearController : Controller {
         constraintCoefficientsGreaterOrEqualTo = (constraintMeasureIdsGEQ.map { c in domain.map { k in predictor.predictCoefficientById(k, c) } })
         constraintCoefficientsEqualTo = (constraintMeasureIdsEQ.map { c in domain.map { k in predictor.predictCoefficientById(k, c) } })
         constraintCoefficientsEqualTo.append([Double](repeating: 1.0, count: sizeOfConfigurations))  
-
+        
         switch intent.optimizationType { 
         case .maximize:
 	    self.multiconstrainedLinearOptimizer =
@@ -409,6 +417,10 @@ class MultilinearController : Controller {
                     constraintCoefficientseq: constraintCoefficientsEqualTo
                     )
         }        
+    }
+
+    func updatePredictor(predictor: NaivePredictor) {
+        self.predictor = predictor
     }
 
     func computeSchedule() {

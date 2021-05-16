@@ -364,15 +364,16 @@ class IntentParser : Parser {
                           case .identifier(let thatKeyword, _) = _lexer.look(ahead: 2).kind, thatKeyword == "that",
                           case .identifier(let constraintName, _) = _lexer.look(ahead: 3).kind { 
                     if case .identifier(let myKeyword, _) = _lexer.look(ahead: 6).kind, myKeyword == "trainingSet"  {
-                        if _lexer.look(ahead: 4).kind == .binaryOperator("==") {
+                        if case .binaryOperator(let constraintType) = _lexer.look(ahead: 4).kind,
+                           constraintType == "<=" || constraintType == "==" || constraintType == ">=" { 
                             _lexer.advance(by: 5)
                             let constraintValue = try super.parseExpression(config: config)
-                            let constraints: [String : (Expression, ConstraintType)] = [constraintName : (constraintValue, .equalTo)] 
+                            let constraints: [String : (Expression, ConstraintType)] = [constraintName : (constraintValue, ConstraintType(rawValue: constraintType)!)] 
                             return IntentDecl(name: intentName, optimizationType : optimizationType,
                                       optimizedExpr: optimizedExpr, constraints: constraints)
                         }
                         else {
-                            Adapt.fatalError("expected a measure name followed by '==' if there is only one constraint. Found: \(_lexer.look(ahead: 4).kind).")
+                            Adapt.fatalError("expected a measure name followed by '>=' or '==' or '<='. Found: \(_lexer.look(ahead: 4).kind).")
                         }
                     } else if case .binaryOperator(let constraintType) = _lexer.look(ahead: 4).kind,
                               constraintType == "<=" || constraintType == "==" || constraintType == ">=" { 

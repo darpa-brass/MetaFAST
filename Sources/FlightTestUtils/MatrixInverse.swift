@@ -1,5 +1,18 @@
 import Foundation
 
+public func getCSVData(contentsOfFile: String) -> [Double] {
+    do {
+        let content = try String(contentsOfFile: contentsOfFile)
+        let parsedCSV: [Double] = content.components(
+            separatedBy: "\n"
+        ).map{ Double($0) ?? 0.0 }
+        return parsedCSV
+    }
+    catch {
+        return []
+    }
+}
+
 // Below is the naive matrix inversion adapted Jaden Geller's impementation (https://gist.github.com/JadenGeller/8c758cbb218a9c4615dd#file-matrix-swift)
 func determinant(_ matrix: [[Double]]) -> Double { 
     // Base case

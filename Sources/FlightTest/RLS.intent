@@ -1,0 +1,10 @@
+knobs    filterSize from [5 reference,6,7]
+         forgettingFactor from [3.0 ... 7.0] reference 5.0
+         successive from [0, 1 reference]
+
+measures    latency: Double
+            RE : Double
+
+intent RLS  min(latency) such that RE <= 20.0
+
+trainingSet []

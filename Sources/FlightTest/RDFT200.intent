@@ -5,6 +5,6 @@ knobs    period from [5 reference,10,15,20,25]
 measures    latency: Double
             MSE : Double
 
-intent RDFT  min(latency) such that MSE <= 3.0
+intent RDFT  min(latency) such that MSE <= 150.0
 
 trainingSet []
