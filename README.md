@@ -1,4 +1,6 @@
-# Adapt
+# MetaFAST
+
+The MetaFAST repository contains three Swift packages: Adapt, FlightTest, and FlightTestUtils.
 
 ### Makefile
 The Adapt package comes with its own `Makefile` and the `FlightTest` example. To build Adapt, simply run
